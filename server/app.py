@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import sqlite3 as sqlite
 
 app = Flask(__name__)
@@ -15,6 +15,10 @@ def init_db():
     conn.commit()
     conn.close()
 
+
+@app.route("/")
+def index():
+    return render_template("index.html")
 
 @app.route("/raw_iridium", methods=["POST"])
 def receive_iridium():
