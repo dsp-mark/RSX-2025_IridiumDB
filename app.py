@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify, render_template, url_for
 import sqlite3 as sqlite
+import binascii
+
 
 app = Flask(__name__)
 
@@ -50,13 +52,21 @@ def index():
 def raw_data():
     if request.method == "POST":
         data = request.get_json()
-        message_to_add = data.get("message")
+        print(data)
+        print(data.get("data"))
+        hex_message = data.get("data")
 
-        if not message_to_add:
-            return jsonify({'error': 'No message provided'}), 400
+        if not hex_message:
+            return jsonify({"error":"No message found"}), 400
         
+        try:
+            decoded_bytes = bytes.fromhex(hex_message)
+            decoded_message = decoded_bytes.decode('utf-8', errors='replace')
+        except Exception as e:
+            return jsonify({"error": f'Failed to decode: {e}'}), 400
+
         db_run(f'''
-                INSERT INTO raw_data (message) VALUES ("{message_to_add}")
+                INSERT INTO raw_data (message) VALUES ("{decoded_message}")
                 ''')
         
         return jsonify({'status': 'Message stored'}), 200
