@@ -1,54 +1,73 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, url_for
 import sqlite3 as sqlite
 
 app = Flask(__name__)
 
+def db_run(SQL_CODE):
+    try:
+        conn = sqlite.connect('rsx.db')
+        c = conn.cursor()
+        c.execute(SQL_CODE)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(e)
+
+def db_fetch(SQL_CODE):
+    try:
+        conn = sqlite.connect('rsx.db')
+        c = conn.cursor()
+        c.execute(SQL_CODE)
+        query_results = c.fetchall()
+        conn.commit()
+        conn.close()
+
+        return query_results
+    except Exception as e:
+        print(e)
+
+
 def init_db():
-    print("Running Init DB; make sure the db was created")
-    conn = sqlite.connect('rsx.db')
-    c = conn.cursor()
-    c.execute('''
-                CREATE TABLE IF NOT EXISTS raw_data (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                message TEXT NOT NULL  
-                );
-              ''')
-    conn.commit()
-    conn.close()
+    db_run('''
+        CREATE TABLE IF NOT EXISTS raw_data (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message TEXT NOT NULL,
+        received_at DATETIME NOT NULL DEFAULT(datetime('now','localtime'))  
+        );
+        ''')
 
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    raw_messages = db_fetch('''
+             SELECT id, message, received_at FROM raw_data;
+             ''')
+    return render_template("index.html", raw_messages=raw_messages)
 
 
 
 @app.route("/raw_iridium", methods=["GET","POST"])
 def raw_data():
-    conn = sqlite.connect('rsx.db')
-    c = conn.cursor()
-    
     if request.method == "POST":
         data = request.get_json()
-        content = data.get("message")
+        message_to_add = data.get("message")
 
-        if not content:
+        if not message_to_add:
             return jsonify({'error': 'No message provided'}), 400
         
-        c.execute('''
-                INSERT INTO raw_data (message) VALUES (?)
-                ''', (content,))
-        conn.commit()
-        conn.close()
+        db_run(f'''
+                INSERT INTO raw_data (message) VALUES ("{message_to_add}")
+                ''')
+        
         return jsonify({'status': 'Message stored'}), 200
+    
     elif request.method == "GET":
-        c.execute('''
-                  SELECT id, message FROM raw_data;
-                  ''')
-        rows = c.fetchall()
-        conn.close()
-        messages = [{"id": row[0], "message": row[1]} 
-        for row in rows]
+        raw_messages = db_fetch('''
+                                SELECT id, message, received_at FROM raw_data;
+                                ''')
+
+        messages = [{"id": msg[0], "message": msg[1], "received_at": msg[2]} 
+        for msg in raw_messages]
         return jsonify(messages), 200
 
 

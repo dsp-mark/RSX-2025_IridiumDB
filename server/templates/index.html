@@ -9,5 +9,21 @@
     <h1>College of the Canyons RockSat-X 2025 Iridium Capsule Dashboard</h1>
 
     <h2>Under construction!</h2>
+
+    {% if raw_messages %}
+
+    <ul>
+        {% for msg in raw_messages %}
+            <li>{{ msg[1] }} <b>Received at {{ msg[2] }}</b></li>
+        {% endfor %}
+    </ul>
+
+    {% else %}
+        <p>No messages found--yet! Please send some to Iridium!</p>
+
+    {% endif %}
+    
+    
+    <script src="{{url_for('static', filename='js/app.js')}}"></script>
 </body>
 </html>
