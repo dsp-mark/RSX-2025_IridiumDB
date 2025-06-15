@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template, url_for
 import sqlite3 as sqlite
+import msgpack
 
 
 app = Flask(__name__)
@@ -40,9 +41,7 @@ def init_db():
 
 @app.route("/")
 def index():
-    raw_messages = db_fetch('''
-             SELECT id, message, received_at FROM raw_data;
-             ''')
+    raw_messages = db_fetch('SELECT id, message, received_at FROM raw_data;')
     return render_template("index.html", raw_messages=raw_messages)
 
 
@@ -59,21 +58,19 @@ def raw_data():
         
         try:
             decoded_bytes = bytes.fromhex(hex_message)
-            decoded_message = decoded_bytes.decode('utf-8', errors='replace')
-            print("DECODED: ", decoded_bytes)
+            #decoded_message = decoded_bytes.decode('utf-8', errors='replace')
+            decoded_message = msgpack.unpackb(decoded_bytes)
+            print("DECODED 1: ", decoded_bytes)
+            print("DECODED 2: ", decoded_message)
         except Exception as e:
             return jsonify({"error": f'Failed to decode: {e}'}), 400
 
-        db_run(f'''
-                INSERT INTO raw_data (message) VALUES ('{decoded_message}')
-                ''')
+        db_run(f"INSERT INTO raw_data (message) VALUES ('{decoded_message}');")
 
         return jsonify({'status': 'Message stored'}), 200
     
     elif request.method == "GET":
-        raw_messages = db_fetch('''
-                                SELECT id, message, received_at FROM raw_data;
-                                ''')
+        raw_messages = db_fetch('SELECT id, message, received_at FROM raw_data;')
 
         messages = [{"id": msg[0], "message": msg[1], "received_at": msg[2]} 
         for msg in raw_messages]
