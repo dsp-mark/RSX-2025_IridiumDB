@@ -1,33 +1,38 @@
-from flask import Flask, request, jsonify, render_template, url_for
+from flask import Flask, request, jsonify, render_template
 import sqlite3 as sqlite
 import msgpack
-
+import json
 
 app = Flask(__name__)
 
-def db_run(SQL_CODE):
+def db_run(SQL_CODE, params=None):
     try:
         conn = sqlite.connect('rsx.db')
         c = conn.cursor()
-        c.execute(SQL_CODE)
+        if params:
+            c.execute(SQL_CODE, params)
+        else:
+            c.execute(SQL_CODE)
         conn.commit()
         conn.close()
     except Exception as e:
         print(e)
 
-def db_fetch(SQL_CODE):
+def db_fetch(SQL_CODE, params=None):
     try:
         conn = sqlite.connect('rsx.db')
         c = conn.cursor()
-        c.execute(SQL_CODE)
+        if params:
+            c.execute(SQL_CODE, params)
+        else:
+            c.execute(SQL_CODE)
         query_results = c.fetchall()
         conn.commit()
         conn.close()
-
         return query_results
     except Exception as e:
         print(e)
-
+        return []
 
 def init_db():
     db_run('''
@@ -38,13 +43,10 @@ def init_db():
         );
         ''')
 
-
 @app.route("/")
 def index():
     raw_messages = db_fetch('SELECT id, message, received_at FROM raw_data;')
     return render_template("index.html", raw_messages=raw_messages)
-
-
 
 @app.route("/raw_iridium", methods=["GET","POST"])
 def raw_data():
@@ -58,24 +60,27 @@ def raw_data():
         
         try:
             decoded_bytes = bytes.fromhex(hex_message)
-            #decoded_message = decoded_bytes.decode('utf-8', errors='replace')
             decoded_message = msgpack.unpackb(decoded_bytes)
             print("DECODED 1: ", decoded_bytes)
             print("DECODED 2: ", decoded_message)
         except Exception as e:
             return jsonify({"error": f'Failed to decode: {e}'}), 400
 
-        db_run(f"INSERT INTO raw_data (message) VALUES ('{decoded_message}');")
+        db_run("INSERT INTO raw_data (message) VALUES (?)", (json.dumps(decoded_message),))
 
         return jsonify({'status': 'Message stored'}), 200
     
     elif request.method == "GET":
         raw_messages = db_fetch('SELECT id, message, received_at FROM raw_data;')
-
-        messages = [{"id": msg[0], "message": msg[1], "received_at": msg[2]} 
-        for msg in raw_messages]
+        messages = [
+            {
+                "id": msg[0],
+                "message": json.loads(msg[1]),
+                "received_at": msg[2]
+            }
+            for msg in raw_messages
+        ]
         return jsonify(messages), 200
-
 
 if __name__ == '__main__':
     init_db()
